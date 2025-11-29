@@ -21,6 +21,10 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
     
+    # JWT Configuration for authentication
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-dev-secret-key-change-in-production')
+    JWT_ACCESS_TOKEN_EXPIRES = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES', '604800'))  # 7 days in seconds
+    
     # API Keys
     TOMTOM_API_KEY = os.getenv('TOMTOM_API_KEY', '')
     
@@ -40,3 +44,7 @@ class Config:
     
     # Traffic Update Interval
     TRAFFIC_UPDATE_INTERVAL = int(os.getenv('TRAFFIC_UPDATE_INTERVAL', '300'))  # seconds
+    
+    # Real-time Mode Settings
+    USE_REALTIME_DATA = os.getenv('USE_REALTIME_DATA', 'True').lower() == 'true'
+    USE_ML_PREDICTIONS = os.getenv('USE_ML_PREDICTIONS', 'False').lower() == 'true'

@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {  // FIXED: added /api/
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
   const signup = async (email, password, name) => {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
-      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {  // FIXED: added /api/
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -126,4 +126,3 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
-

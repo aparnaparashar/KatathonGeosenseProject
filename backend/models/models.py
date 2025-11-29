@@ -63,3 +63,23 @@ class Report(db.Document):
         'indexes': ['report_type', 'stakeholder_type', 'generated_at']
     }
 
+class User(db.Document):
+    name = db.StringField(required=True, max_length=100)
+    email = db.EmailField(required=True, unique=True)
+    password = db.StringField(required=True)
+    created_at = db.DateTimeField(default=datetime.utcnow)  # FIXED: removed datetime.datetime
+    updated_at = db.DateTimeField(default=datetime.utcnow)  # FIXED: removed datetime.datetime
+    
+    def to_json(self):
+        return {
+            'id': str(self.id),
+            'name': self.name,
+            'email': self.email,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }
+    
+    meta = {
+        'collection': 'users',
+        'indexes': ['email']
+    }
