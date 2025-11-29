@@ -32,13 +32,13 @@ function AppContent() {
           <Route 
             path="/signin" 
             element={
-              isAuthenticated ? <Navigate to="/dashboard" replace /> : <SignIn />
+              isAuthenticated ? <Navigate to="/home" replace /> : <SignIn />
             } 
           />
           <Route 
             path="/signup" 
             element={
-              isAuthenticated ? <Navigate to="/dashboard" replace /> : <SignUp />
+              isAuthenticated ? <Navigate to="/home" replace /> : <SignUp />
             } 
           />
           <Route 
