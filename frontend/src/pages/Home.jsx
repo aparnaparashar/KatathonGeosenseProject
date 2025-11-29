@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { ArrowRight, Car, Shield, Zap, Route, Leaf, DollarSign, TrendingUp, Clock } from 'lucide-react'
 import heroCity from '../../hero-city.jpg'
 import './Home.css'
+import Chatbot from '../components/Chatbot'
 
 const Home = () => {
   const navigate = useNavigate()
@@ -254,6 +255,7 @@ const Home = () => {
           </div>
         </div>
       </section>
+      <Chatbot />
     </div>
   )
 }
