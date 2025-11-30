@@ -209,6 +209,56 @@ class TrafficAPI:
             logger.error(f"Error searching POIs: {e}")
             return {'success': False, 'error': str(e)}
     
+    def geocode_location(self, location_name):
+        """
+        Convert location name to coordinates using TomTom Geocoding API
+        Uses /search/2/geocode/{query}.json endpoint
+        
+        Args:
+            location_name: String name of the location (e.g., "Delhi", "Times Square")
+            
+        Returns:
+            dict with 'success', 'lat', 'lon', and 'address' keys
+        """
+        url = f"{self.base_url}/search/2/geocode/{location_name}.json"
+        
+        params = {
+            'key': self.tomtom_api_key,
+            'limit': 1,
+            'language': 'en-US'
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if 'results' in data and len(data['results']) > 0:
+                result = data['results'][0]
+                position = result.get('position', {})
+                address = result.get('address', {})
+                
+                return {
+                    'success': True,
+                    'lat': position.get('lat'),
+                    'lon': position.get('lon'),
+                    'address': address.get('freeformAddress', location_name),
+                    'full_address': address,
+                    'type': result.get('type', 'unknown')
+                }
+            
+            return {
+                'success': False,
+                'error': f'Location "{location_name}" not found'
+            }
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error geocoding location '{location_name}': {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
     def _calculate_congestion_level(self, current_speed, free_flow_speed):
         """Calculate congestion level based on speed ratio"""
         if free_flow_speed == 0:

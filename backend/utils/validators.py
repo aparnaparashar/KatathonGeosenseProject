@@ -19,7 +19,9 @@ def validate_coordinates(lat, lon):
         return False, "Invalid coordinate format"
 
 def validate_route_params(data):
-    """Validate route calculation parameters"""
+    """Validate route calculation parameters
+    Accepts location names (strings) or coordinate objects
+    """
     if not isinstance(data, dict):
         return False, "Invalid request format"
     
@@ -29,25 +31,32 @@ def validate_route_params(data):
     origin = data['origin']
     destination = data['destination']
     
-    if not isinstance(origin, dict) or not isinstance(destination, dict):
-        return False, "Origin and destination must be objects with lat/lon"
+    # Accept strings (location names) - will be geocoded
+    if isinstance(origin, str) and isinstance(destination, str):
+        if not origin.strip() or not destination.strip():
+            return False, "Origin and destination cannot be empty"
+        return True, None
     
-    if 'lat' not in origin or 'lon' not in origin:
-        return False, "Origin missing lat or lon"
+    # Accept coordinate objects for backward compatibility
+    if isinstance(origin, dict) and isinstance(destination, dict):
+        if 'lat' not in origin or 'lon' not in origin:
+            return False, "Origin missing lat or lon"
+        
+        if 'lat' not in destination or 'lon' not in destination:
+            return False, "Destination missing lat or lon"
+        
+        # Validate coordinates
+        valid, error = validate_coordinates(origin['lat'], origin['lon'])
+        if not valid:
+            return False, f"Invalid origin: {error}"
+        
+        valid, error = validate_coordinates(destination['lat'], destination['lon'])
+        if not valid:
+            return False, f"Invalid destination: {error}"
+        
+        return True, None
     
-    if 'lat' not in destination or 'lon' not in destination:
-        return False, "Destination missing lat or lon"
-    
-    # Validate coordinates
-    valid, error = validate_coordinates(origin['lat'], origin['lon'])
-    if not valid:
-        return False, f"Invalid origin: {error}"
-    
-    valid, error = validate_coordinates(destination['lat'], destination['lon'])
-    if not valid:
-        return False, f"Invalid destination: {error}"
-    
-    return True, None
+    return False, "Origin and destination must be location names (strings) or coordinate objects"
 
 def validate_bbox(bbox_str):
     """Validate bounding box format: minLon,minLat,maxLon,maxLat"""

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import ProtectedRoute from '../components/ProtectedRoute'
+import MapComponent from '../components/MapComponent'
 import { Leaf, MapPin, Zap, TrendingUp, Users, Clock, AlertTriangle } from 'lucide-react'
 import { 
   PieChart, 
@@ -46,12 +47,64 @@ const Dashboard = () => {
     recentRoutes: [],
   })
   const [loading, setLoading] = useState(true)
+  const [currentLocation, setCurrentLocation] = useState(null)
+  const [locationError, setLocationError] = useState(null)
+  const [locationLoading, setLocationLoading] = useState(true)
 
   useEffect(() => {
     fetchDashboardData()
     // Poll every 5 seconds
     const interval = setInterval(fetchDashboardData, 5000)
     return () => clearInterval(interval)
+  }, [])
+
+  // Get user's current location using browser geolocation API
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      setLocationLoading(true)
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          setCurrentLocation({
+            lat: latitude,
+            lon: longitude,
+          })
+          // Update dashboardData location as well for backward compatibility
+          setDashboardData((prev) => ({
+            ...prev,
+            location: {
+              lat: latitude,
+              lng: longitude,
+            },
+          }))
+          setLocationLoading(false)
+          setLocationError(null)
+        },
+        (error) => {
+          console.error('Geolocation error:', error)
+          setLocationError(error.message)
+          setLocationLoading(false)
+          // Keep default location if geolocation fails
+          setCurrentLocation({
+            lat: dashboardData.location.lat,
+            lon: dashboardData.location.lng,
+          })
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      )
+    } else {
+      setLocationError('Geolocation is not supported by your browser')
+      setLocationLoading(false)
+      // Use default location
+      setCurrentLocation({
+        lat: dashboardData.location.lat,
+        lon: dashboardData.location.lng,
+      })
+    }
   }, [])
 
   const fetchDashboardData = async () => {
@@ -210,16 +263,64 @@ const Dashboard = () => {
               </h3>
               <p className="card-subtitle">Your current position</p>
               <div className="location-content">
-                <div className="location-map-placeholder">
-                  <MapPin size={48} className="location-pin" />
-                  <p className="location-text">You are here</p>
-                  <p className="location-coords">
-                    Lat: {dashboardData.location.lat}, Lng: {dashboardData.location.lng}
-                  </p>
-                </div>
+                {locationLoading ? (
+                  <div className="location-map-placeholder">
+                    <MapPin size={48} className="location-pin" />
+                    <p className="location-text">Getting your location...</p>
+                    <p className="location-coords">Please allow location access</p>
+                  </div>
+                ) : locationError ? (
+                  <div className="location-map-placeholder">
+                    <MapPin size={48} className="location-pin" />
+                    <p className="location-text">Location unavailable</p>
+                    <p className="location-coords" style={{ color: '#ef4444', fontSize: '0.85rem' }}>
+                      {locationError}
+                    </p>
+                    <p className="location-coords">
+                      Using default: Lat: {currentLocation?.lat?.toFixed(4) || dashboardData.location.lat}, 
+                      Lng: {currentLocation?.lon?.toFixed(4) || dashboardData.location.lng}
+                    </p>
+                  </div>
+                ) : currentLocation ? (
+                  <div className="location-map-container">
+                    <MapComponent
+                      center={[currentLocation.lat, currentLocation.lon]}
+                      zoom={15}
+                      markers={[
+                        {
+                          position: [currentLocation.lat, currentLocation.lon],
+                          popup: (
+                            <div>
+                              <strong>Your Location</strong>
+                              <br />
+                              Lat: {currentLocation.lat.toFixed(6)}
+                              <br />
+                              Lng: {currentLocation.lon.toFixed(6)}
+                            </div>
+                          ),
+                        },
+                      ]}
+                      className="dashboard-map"
+                    />
+                  </div>
+                ) : (
+                  <div className="location-map-placeholder">
+                    <MapPin size={48} className="location-pin" />
+                    <p className="location-text">You are here</p>
+                    <p className="location-coords">
+                      Lat: {dashboardData.location.lat}, Lng: {dashboardData.location.lng}
+                    </p>
+                  </div>
+                )}
                 <div className="location-status">
                   <Zap size={14} />
-                  <span>Location tracking active</span>
+                  <span>
+                    {locationLoading
+                      ? 'Getting location...'
+                      : locationError
+                      ? 'Using default location'
+                      : 'Location tracking active'}
+                  </span>
                 </div>
               </div>
             </motion.div>

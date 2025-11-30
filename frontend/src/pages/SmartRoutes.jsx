@@ -3,6 +3,8 @@ import { motion } from 'framer-motion'
 import { Send, MapPin } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import ProtectedRoute from '../components/ProtectedRoute'
+import MapComponent from '../components/MapComponent'
+import MapFilters from '../components/MapFilters'
 import { compareRoutes } from '../utils/api'
 import './SmartRoutes.css'
 
@@ -13,7 +15,22 @@ const SmartRoutes = () => {
   const [routes, setRoutes] = useState(null)
   const [error, setError] = useState('')
   const [selectedRoute, setSelectedRoute] = useState(null)
+  const [mapFilters, setMapFilters] = useState({
+    pois: false,
+    traffic: false,
+    quiet: false,
+    publicTransport: false,
+    walkFriendly: false,
+    time: '12:00'
+  })
   const { getAuthHeader } = useAuth()
+
+  const handleFilterChange = (filterId, value) => {
+    setMapFilters(prev => ({
+      ...prev,
+      [filterId]: value
+    }))
+  }
 
   const handleFindRoutes = async (e) => {
     e.preventDefault()
@@ -22,35 +39,56 @@ const SmartRoutes = () => {
     setRoutes(null)
 
     try {
-      const result = await compareRoutes(origin, destination)
+      const response = await compareRoutes(origin, destination)
+      
+      // Backend returns { success: true/false, data: {...}, error: ... }
+      // Extract data from response
+      const routeData = response.success ? (response.data || response) : response
+      
+      if (!routeData || (routeData.success === false)) {
+        throw new Error(routeData?.error || 'Route calculation failed')
+      }
       
       // Transform backend response to match our format
       const routeOptions = [
         {
           type: 'Fastest',
-          time: result.fastest?.duration || '25 min',
-          distance: result.fastest?.distance || '12.5 km',
-          cost: result.fastest?.cost || '$5.20',
-          color: '#2196f3',
-          data: result.fastest,
+          id: 'fastest',
+          time: routeData.fastest?.duration || `${Math.round(routeData.fastest?.duration_minutes || 0)} min`,
+          distance: routeData.fastest?.distance || `${routeData.fastest?.distance_km || 0} km`,
+          cost: routeData.fastest?.cost || `$${routeData.fastest?.cost_usd || 0}`,
+          color: '#1E90FF', // Blue
+          data: { ...routeData.fastest, origin: routeData.origin, destination: routeData.destination },
+          polyline: routeData.fastest?.polyline || [],
+          geometry: routeData.fastest?.geometry || [],
         },
         {
           type: 'Eco-Friendly',
-          time: result.eco?.duration || '30 min',
-          distance: result.eco?.distance || '13.2 km',
-          cost: result.eco?.cost || '$4.80',
-          color: '#4caf50',
-          data: result.eco,
+          id: 'eco',
+          time: routeData.eco?.duration || `${Math.round(routeData.eco?.duration_minutes || 0)} min`,
+          distance: routeData.eco?.distance || `${routeData.eco?.distance_km || 0} km`,
+          cost: routeData.eco?.cost || `$${routeData.eco?.cost_usd || 0}`,
+          color: '#228B22', // Green
+          data: { ...routeData.eco, origin: routeData.origin, destination: routeData.destination },
+          polyline: routeData.eco?.polyline || [],
+          geometry: routeData.eco?.geometry || [],
         },
         {
           type: 'Cost Efficient',
-          time: result.cheapest?.duration || '28 min',
-          distance: result.cheapest?.distance || '12.8 km',
-          cost: result.cheapest?.cost || '$4.50',
-          color: '#ff9800',
-          data: result.cheapest,
+          id: 'cheapest',
+          time: routeData.cheapest?.duration || `${Math.round(routeData.cheapest?.duration_minutes || 0)} min`,
+          distance: routeData.cheapest?.distance || `${routeData.cheapest?.distance_km || 0} km`,
+          cost: routeData.cheapest?.cost || `$${routeData.cheapest?.cost_usd || 0}`,
+          color: '#FF8C00', // Orange
+          data: { ...routeData.cheapest, origin: routeData.origin, destination: routeData.destination },
+          polyline: routeData.cheapest?.polyline || [],
+          geometry: routeData.cheapest?.geometry || [],
         },
-      ]
+      ].filter(route => route.data?.success !== false) // Filter out failed routes
+
+      if (routeOptions.length === 0) {
+        throw new Error('No routes found. Please check your origin and destination.')
+      }
 
       setRoutes(routeOptions)
       setSelectedRoute(routeOptions[0])
@@ -102,7 +140,7 @@ const SmartRoutes = () => {
                     id="origin"
                     value={origin}
                     onChange={(e) => setOrigin(e.target.value)}
-                    placeholder="e.g., Downtown Station"
+                    placeholder="e.g., Delhi, Times Square, Mumbai"
                     required
                   />
                 </div>
@@ -113,7 +151,7 @@ const SmartRoutes = () => {
                     id="destination"
                     value={destination}
                     onChange={(e) => setDestination(e.target.value)}
-                    placeholder="e.g., City Airport"
+                    placeholder="e.g., Mumbai, Connaught Place, Noida"
                     required
                   />
                 </div>
@@ -142,16 +180,19 @@ const SmartRoutes = () => {
             >
               <div className="results-grid">
                 <div className="map-panel">
-                  <div className="map-container">
-                    <div className="map-visualization">
-                      <div className="map-route-line-animated"></div>
-                      <div className="map-pin map-pin-start">
-                        <MapPin size={20} />
-                      </div>
-                      <div className="map-pin map-pin-end">
-                        <MapPin size={20} />
-                      </div>
-                    </div>
+                  <div className="map-wrapper">
+                    <MapFilters
+                      filters={mapFilters}
+                      onFilterChange={handleFilterChange}
+                      className="map-filters-overlay"
+                    />
+                    <MapComponent
+                      routes={routes}
+                      selectedRouteId={selectedRoute?.id}
+                      origin={routes?.[0]?.data?.origin}
+                      destination={routes?.[0]?.data?.destination}
+                      className="route-map"
+                    />
                   </div>
                 </div>
 
@@ -165,7 +206,10 @@ const SmartRoutes = () => {
                         initial={{ width: 0 }}
                         animate={{ width: '100%' }}
                         transition={{ duration: 0.8, delay: index * 0.1 }}
-                        onClick={() => setSelectedRoute(route)}
+                        onClick={() => {
+                          setSelectedRoute(route)
+                          // Scroll map into view if needed
+                        }}
                         style={{ '--route-color': route.color }}
                       >
                         <div className="route-bar-content">

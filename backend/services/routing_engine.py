@@ -5,6 +5,7 @@ Calculates fastest, cheapest, and eco-friendly routes using TomTom API
 
 import requests
 from config import Config
+from services.traffic_api import TrafficAPI
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,12 +18,26 @@ class RoutingEngine:
         self.base_url = "https://api.tomtom.com"
         self.cost_per_km = Config.COST_PER_KM
         self.co2_per_km = Config.CO2_PER_KM_CAR
+        self.traffic_api = TrafficAPI()  # For geocoding
     
     def _normalize_coordinates(self, point):
         """
         Normalize coordinate input to [lat, lon] format
-        Accepts: [lat, lon], {"lat": x, "lon": y}, {"lat": x, "lng": y}, {"latitude": x, "longitude": y}
+        Accepts: 
+        - Location name (string): "Delhi", "Times Square" -> geocodes it
+        - [lat, lon] list
+        - {"lat": x, "lon": y} dict
+        - {"lat": x, "lng": y} dict
+        - {"latitude": x, "longitude": y} dict
         """
+        # If it's a string, treat it as a location name and geocode it
+        if isinstance(point, str):
+            logger.info(f"Geocoding location name: {point}")
+            geocode_result = self.traffic_api.geocode_location(point)
+            if not geocode_result.get('success'):
+                raise ValueError(f"Geocoding failed for '{point}': {geocode_result.get('error', 'Unknown error')}")
+            return [geocode_result['lat'], geocode_result['lon']]
+        
         if isinstance(point, (list, tuple)) and len(point) == 2:
             return [float(point[0]), float(point[1])]
         
@@ -159,9 +174,10 @@ class RoutingEngine:
         """
         Compare all three route types
         Returns fastest, cheapest, and eco-friendly routes with comparison
+        Accepts location names (strings) or coordinates
         """
         try:
-            # Normalize coordinates once
+            # Normalize coordinates once (geocodes if strings are provided)
             origin_norm = self._normalize_coordinates(origin)
             destination_norm = self._normalize_coordinates(destination)
             
@@ -174,11 +190,9 @@ class RoutingEngine:
             
             return {
                 'success': True,
-                'routes': {
-                    'fastest': fastest,
-                    'cheapest': cheapest,
-                    'eco_friendly': eco
-                },
+                'fastest': fastest,
+                'cheapest': cheapest,
+                'eco': eco,  # Frontend expects 'eco' not 'eco_friendly'
                 'comparison': comparison,
                 'origin': {'lat': origin_norm[0], 'lon': origin_norm[1]},
                 'destination': {'lat': destination_norm[0], 'lon': destination_norm[1]}
@@ -205,13 +219,35 @@ class RoutingEngine:
         cost = round(distance_km * self.cost_per_km, 2)
         co2 = round(distance_km * self.co2_per_km, 2)
         
-        # Extract route geometry (coordinates)
+        # Extract route geometry (polyline coordinates) - for map visualization
         geometry = []
+        polyline = []  # Array of [lat, lon] for polyline drawing
+        
+        # TomTom API returns geometry in routes[0].legs[].points[]
         if legs:
             for leg in legs:
                 points = leg.get('points', [])
                 for point in points:
-                    geometry.append([point.get('latitude'), point.get('longitude')])
+                    # TomTom uses 'latitude' and 'longitude' keys
+                    lat = point.get('latitude') or point.get('lat')
+                    lon = point.get('longitude') or point.get('lon')
+                    if lat is not None and lon is not None:
+                        geometry.append([float(lat), float(lon)])
+                        polyline.append({'lat': float(lat), 'lon': float(lon)})
+        
+        # If no geometry from legs, try sections (alternative format)
+        if not geometry and 'sections' in route:
+            sections = route.get('sections', [])
+            for section in sections:
+                section_geometry = section.get('geometry', {})
+                # Check if geometry is encoded polyline or coordinate list
+                if 'coordinates' in section_geometry:
+                    coords = section_geometry['coordinates']
+                    for coord in coords:
+                        if len(coord) >= 2:
+                            lat, lon = float(coord[1]), float(coord[0])  # GeoJSON format [lon, lat]
+                            geometry.append([lat, lon])
+                            polyline.append({'lat': lat, 'lon': lon})
         
         # Extract turn-by-turn instructions
         instructions = []
@@ -228,14 +264,18 @@ class RoutingEngine:
         return {
             'success': True,
             'route_type': route_type,
+            'distance': f"{round(distance_km, 1)} km",
             'distance_km': round(distance_km, 2),
+            'duration': f"{int(duration_minutes)} min",
             'duration_minutes': round(duration_minutes, 1),
             'duration_with_traffic': round(duration_minutes + traffic_delay, 1),
             'traffic_delay_minutes': round(traffic_delay, 1),
+            'cost': f"${cost:.2f}",
             'cost_usd': cost,
             'co2_kg': co2,
             'fuel_consumption_liters': round(distance_km * 0.08, 2),
-            'geometry': geometry,
+            'geometry': geometry,  # Array of [lat, lon] arrays
+            'polyline': polyline,  # Array of {lat, lon} objects for easier frontend use
             'instructions': instructions[:10],
             'summary': {
                 'departure_time': summary.get('departureTime'),
