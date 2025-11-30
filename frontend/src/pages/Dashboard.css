@@ -200,6 +200,21 @@
   justify-content: center;
 }
 
+.location-map-container {
+  width: 100%;
+  height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-map {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+}
+
 .location-pin {
   color: #2196f3;
   margin-bottom: 1rem;

@@ -26,7 +26,7 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES', '604800'))  # 7 days in seconds
     
     # API Keys
-    TOMTOM_API_KEY = os.getenv('TOMTOM_API_KEY', '')
+    TOMTOM_API_KEY = os.getenv('TOMTOM_API_KEY', 'P9qBEYuHG256dbid1aYvjznVuZNXnc5h')
     
     # CORS
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5173').split(',')
